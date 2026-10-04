@@ -1,0 +1,21 @@
+{
+  "name": "aroma-lab",
+  "version": "1.0.0",
+  "description": "AROMA LAB — Complete CMS + E-commerce + Worker API",
+  "private": true,
+  "scripts": {
+    "deploy:worker": "wrangler deploy",
+    "dev:worker": "wrangler dev",
+    "tail:worker": "wrangler tail"
+  },
+  "keywords": [
+    "aroma-lab",
+    "perfume",
+    "ecommerce",
+    "cloudflare",
+    "workers",
+    "d1"
+  ],
+  "author": "AROMA LAB",
+  "license": "UNLICENSED"
+}
