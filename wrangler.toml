@@ -1,0 +1,13 @@
+name = "aroma-lab-api"
+main = "worker/index.js"
+compatibility_date = "2026-10-04"
+
+[vars]
+SITE_URL = "https://aromalabsl.lk"
+ADMIN_EMAIL = "sajith.kasp@gmail.com"
+GOOGLE_CLIENT_ID = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aroma-lab-db"
+database_id = "edebade8-31e3-4fbe-b9b0-8761eb947b24"
