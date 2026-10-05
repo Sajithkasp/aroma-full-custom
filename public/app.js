@@ -1,6 +1,3 @@
-window.addEventListener("error", function(e) {
-  alert("JS ERROR: " + e.message + " at line " + e.lineno);
-});
 (function () {
   "use strict";
 
@@ -214,7 +211,6 @@ window.addEventListener("error", function(e) {
     var btns = document.querySelectorAll("[data-action]");
     for (var i = 0; i < btns.length; i++) {
       var btn = btns[i];
-      var action = btn.getAttribute("data-action");
       btn.onclick = function (e) {
         e.preventDefault();
         var a = this.getAttribute("data-action");
@@ -224,7 +220,7 @@ window.addEventListener("error", function(e) {
             location.hash = "#/account";
             render();
           } else {
-            loginGoogle();
+            openGoogleLoginModal();
           }
         } else if (a === "menu") {
           var nav = document.querySelector("nav");
@@ -684,7 +680,7 @@ window.addEventListener("error", function(e) {
     };
   }
 
-  function loginGoogle() {
+  function openGoogleLoginModal() {
     try {
       var clientId = "";
       if (S && S.google_client_id) clientId = String(S.google_client_id);
@@ -705,9 +701,33 @@ window.addEventListener("error", function(e) {
         return;
       }
 
+      var modalId = "aromaGoogleLoginModal";
+      var existing = document.getElementById(modalId);
+      if (existing) existing.remove();
+
+      var modalHtml =
+        '<div id="' + modalId + '" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:grid;place-items:center;padding:20px">' +
+          '<div style="background:#15120f;border:1px solid #3b3026;border-radius:16px;padding:30px;width:min(400px,90vw);text-align:center">' +
+            '<h2 style="font-family:Georgia,serif;color:#d4af37;margin-bottom:8px;letter-spacing:2px">AROMA LAB</h2>' +
+            '<p style="color:#b9ad9e;font-size:13px;margin-bottom:24px">Sign in with Google to continue</p>' +
+            '<div id="aromaGoogleBtn" style="display:flex;justify-content:center"></div>' +
+            '<button type="button" id="aromaGoogleClose" style="margin-top:20px;background:transparent;border:1px solid #4a3b2b;color:#eee6db;padding:10px 24px;border-radius:99px;cursor:pointer;font-weight:600;font-size:13px">Cancel</button>' +
+          '</div>' +
+        '</div>';
+
+      document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+      document.getElementById("aromaGoogleClose").onclick = function () {
+        var m = document.getElementById(modalId);
+        if (m) m.remove();
+      };
+
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: function (response) {
+          var m = document.getElementById(modalId);
+          if (m) m.remove();
+
           fetch(API + "/api/auth/google", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -730,7 +750,12 @@ window.addEventListener("error", function(e) {
             });
         }
       });
-      window.google.accounts.id.prompt();
+
+      window.google.accounts.id.renderButton(
+        document.getElementById("aromaGoogleBtn"),
+        { theme: "filled_black", size: "large", width: 280, text: "signin_with", shape: "pill" }
+      );
+
     } catch (err) {
       alert("Login error: " + err.message);
     }
@@ -778,7 +803,7 @@ window.addEventListener("error", function(e) {
 
   function checkout() {
     if (!user) {
-      loginGoogle();
+      openGoogleLoginModal();
       return;
     }
     var address = prompt("Shipping address:");
@@ -974,7 +999,7 @@ window.addEventListener("error", function(e) {
   window.aromaRemove = removeFromCart;
   window.aromaOpenCart = openCart;
   window.aromaCheckout = checkout;
-  window.aromaLogin = loginGoogle;
+  window.aromaLogin = openGoogleLoginModal;
   window.aromaOpenAroma = openAroma;
   window.aromaAsk = askAroma;
   window.aromaSubscribe = subscribeNewsletter;
