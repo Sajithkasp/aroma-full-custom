@@ -1,5 +1,3 @@
-alert("aromaLogin type: " + typeof window.aromaLogin);
-alert("AROMA APP.JS LOADED");
 (function () {
   "use strict";
 
@@ -26,19 +24,21 @@ alert("AROMA APP.JS LOADED");
   var menus = [];
   var currencies = [];
   var user = null;
-  var cart = JSON.parse(localStorage.getItem("aroma_cart") || "[]");
-
-  var ICON_CART = "&#128722;";
-  var ICON_ADMIN = "&#9881;";
-  var ICON_MENU = "&#9776;";
-  var ICON_STAR = "&#9733;";
-  var ICON_CLOSE = "&times;";
-  var ICON_DOT = "&middot;";
-  var ICON_DASH = "&mdash;";
+  var cart = [];
+  try {
+    cart = JSON.parse(localStorage.getItem("aroma_cart") || "[]");
+    if (!Array.isArray(cart)) cart = [];
+  } catch (e) {
+    cart = [];
+  }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+      if (c === "&") return "&amp;";
+      if (c === "<") return "&lt;";
+      if (c === ">") return "&gt;";
+      if (c === '"') return "&quot;";
+      return "&#39;";
     });
   }
 
@@ -56,7 +56,9 @@ alert("AROMA APP.JS LOADED");
     opts = opts || {};
     var headers = { "Content-Type": "application/json" };
     if (opts.headers) {
-      for (var k in opts.headers) headers[k] = opts.headers[k];
+      for (var k in opts.headers) {
+        headers[k] = opts.headers[k];
+      }
     }
     var config = {
       credentials: "include",
@@ -73,19 +75,29 @@ alert("AROMA APP.JS LOADED");
   }
 
   function save() {
-    localStorage.setItem("aroma_cart", JSON.stringify(cart));
+    try {
+      localStorage.setItem("aroma_cart", JSON.stringify(cart));
+    } catch (e) {}
   }
 
   function addToCart(p) {
+    if (!p || !p.id) return;
     var existing = null;
     for (var i = 0; i < cart.length; i++) {
       if (cart[i].id === p.id) { existing = cart[i]; break; }
     }
-    if (existing) existing.qty++;
-    else cart.push({
-      id: p.id, name: p.name, price: Number(p.price || 0),
-      image: img(p), qty: 1, sku: p.sku || ""
-    });
+    if (existing) {
+      existing.qty++;
+    } else {
+      cart.push({
+        id: p.id,
+        name: p.name || "",
+        price: Number(p.price || 0),
+        image: img(p),
+        qty: 1,
+        sku: p.sku || ""
+      });
+    }
     save();
     toast("Added to cart");
     renderCartCount();
@@ -139,8 +151,15 @@ alert("AROMA APP.JS LOADED");
 
   function isAdmin() {
     if (!user || !user.email) return false;
-    var adminEmail = (C.ADMIN_EMAIL || "").toLowerCase();
-    return user.email.toLowerCase() === adminEmail;
+    var adminEmail = String(C.ADMIN_EMAIL || "").toLowerCase();
+    return String(user.email).toLowerCase() === adminEmail;
+  }
+
+  function repeat(s, n) {
+    var out = "";
+    var count = Math.max(0, Math.min(5, Number(n) || 0));
+    for (var i = 0; i < count; i++) out += s;
+    return out;
   }
 
   function header() {
@@ -164,17 +183,18 @@ alert("AROMA APP.JS LOADED");
 
     var cartHtml = "";
     if (h.show_cart !== false) {
-      cartHtml = '<button class="iconbtn" onclick="window.aromaOpenCart()">' + ICON_CART + ' <span data-cart-count>0</span></button>';
+      cartHtml = '<button type="button" class="iconbtn" data-action="cart">Cart <span data-cart-count>0</span></button>';
     }
 
     var adminHtml = "";
     if (isAdmin()) {
-      adminHtml = '<a class="admin-btn" href="/admin/">' + ICON_ADMIN + ' Admin</a>';
+      adminHtml = '<a class="admin-btn" href="/admin/">Admin</a>';
     }
 
     var loginHtml = "";
     if (h.show_login !== false) {
-      loginHtml = '<button class="goldbtn" onclick="window.aromaLogin()">' + (user ? "Account" : "Sign in") + "</button>";
+      var label = user ? "Account" : "Sign in";
+      loginHtml = '<button type="button" class="goldbtn" data-action="login">' + label + "</button>";
     }
 
     return announceHtml + '<header><div class="container nav">' +
@@ -183,8 +203,32 @@ alert("AROMA APP.JS LOADED");
       "<small>" + esc(S.site.descriptor || "FINE FRAGRANCES") + "</small></span></a>" +
       "<nav>" + menuHtml + "</nav>" +
       '<div class="nav-actions">' + cartHtml + adminHtml + loginHtml +
-      '<button class="menuBtn" onclick="window.aromaToggleMenu()">' + ICON_MENU + '</button>' +
+      '<button type="button" class="menuBtn" data-action="menu">Menu</button>' +
       "</div></div></header>";
+  }
+
+  function bindHeader() {
+    var btns = document.querySelectorAll("[data-action]");
+    for (var i = 0; i < btns.length; i++) {
+      var btn = btns[i];
+      var action = btn.getAttribute("data-action");
+      btn.onclick = function (e) {
+        e.preventDefault();
+        var a = this.getAttribute("data-action");
+        if (a === "cart") openCart();
+        else if (a === "login") {
+          if (user) {
+            location.hash = "#/account";
+            render();
+          } else {
+            loginGoogle();
+          }
+        } else if (a === "menu") {
+          var nav = document.querySelector("nav");
+          if (nav) nav.classList.toggle("open");
+        }
+      };
+    }
   }
 
   function footer() {
@@ -227,7 +271,7 @@ alert("AROMA APP.JS LOADED");
       : '<div style="display:grid;place-items:center;height:100%;color:#555;font-size:12px">No Image</div>';
 
     var gender = p.gender || "UNISEX";
-    var size = p.size ? " " + ICON_DOT + " " + esc(p.size) : "";
+    var size = p.size ? " | " + esc(p.size) : "";
 
     return '<article class="card">' +
       '<a href="#/product/' + p.id + '" class="product-img">' + imgHtml + "</a>" +
@@ -237,9 +281,24 @@ alert("AROMA APP.JS LOADED");
       '<p class="muted desc">' + esc(p.description || "") + "</p>" +
       '<div class="price">' + money(p.price) + "</div>" +
       '<div class="card-actions">' +
-      '<button class="ghostbtn" onclick=\'window.aromaAdd(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>Add</button>' +
+      '<button type="button" class="ghostbtn" data-add="' + p.id + '">Add</button>' +
       '<a class="goldbtn" href="#/product/' + p.id + '">View</a>' +
       "</div></div></article>";
+  }
+
+  function bindAddButtons() {
+    var btns = document.querySelectorAll("[data-add]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].onclick = function (e) {
+        e.preventDefault();
+        var id = this.getAttribute("data-add");
+        var prod = null;
+        for (var j = 0; j < products.length; j++) {
+          if (String(products[j].id) === String(id)) { prod = products[j]; break; }
+        }
+        if (prod) addToCart(prod);
+      };
+    }
   }
 
   function home() {
@@ -290,7 +349,7 @@ alert("AROMA APP.JS LOADED");
           '<div class="kicker">ASK AROMA</div>' +
           "<h2>Your Scent Guide</h2>" +
           '<p class="muted bigline">Find a fragrance that matches your mood.</p>' +
-          '<button class="goldbtn" onclick="window.aromaOpenAroma()">Ask Aroma</button>' +
+          '<button type="button" class="goldbtn" data-action="aroma">Ask Aroma</button>' +
           "</div></div>";
       }
       storyHtml += "</section>";
@@ -302,7 +361,7 @@ alert("AROMA APP.JS LOADED");
         '<div class="section-head"><div><div class="kicker">LOVE</div><h2>Testimonials</h2></div></div>' +
         '<div class="reviews">' +
         testimonials.slice(0, 6).map(function (t) {
-          var stars = repeat(ICON_STAR, Math.max(0, Math.min(5, Number(t.rating || 5))));
+          var stars = repeat("&#9733;", Number(t.rating || 5));
           return '<div class="review"><div class="stars">' + stars + "</div>" +
             "<b>" + esc(t.name) + "</b>" +
             '<p class="muted">' + esc(t.content || "") + "</p></div>";
@@ -316,7 +375,7 @@ alert("AROMA APP.JS LOADED");
         '<div class="section-head"><div><div class="kicker">REVIEWS</div><h2>Customer Reviews</h2></div></div>' +
         '<div class="reviews">' +
         reviews.slice(0, 6).map(function (r) {
-          var stars = repeat(ICON_STAR, Math.max(0, Math.min(5, Number(r.rating || 0))));
+          var stars = repeat("&#9733;", Number(r.rating || 0));
           return '<div class="review"><div class="stars">' + stars + "</div>" +
             "<b>" + esc(r.customer_name || "Customer") + "</b>" +
             '<p class="muted">' + esc(r.review || "") + "</p></div>";
@@ -348,7 +407,7 @@ alert("AROMA APP.JS LOADED");
         '<p class="muted">Get updates on new fragrances and offers.</p>' +
         '<div class="chatrow" style="justify-content:center">' +
         '<input id="nlEmail" placeholder="Your email" type="email">' +
-        '<button class="goldbtn" onclick="window.aromaSubscribe()">Subscribe</button>' +
+        '<button type="button" class="goldbtn" data-action="newsletter">Subscribe</button>' +
         "</div></div></section>";
     }
 
@@ -359,7 +418,7 @@ alert("AROMA APP.JS LOADED");
 
     var fabHtml = "";
     if (S.ask_aroma && S.ask_aroma.enabled) {
-      fabHtml = '<button class="aroma-fab" onclick="window.aromaOpenAroma()">A</button>';
+      fabHtml = '<button type="button" class="aroma-fab" data-action="aroma">A</button>';
     }
 
     return header() +
@@ -372,27 +431,47 @@ alert("AROMA APP.JS LOADED");
       '<section class="section container features">' +
       "<div><b>Islandwide Delivery</b>" +
       '<p class="muted">' + esc((S.delivery && S.delivery.note) || "Fast delivery.") + "</p></div>" +
-      "<div><b>Secure Login</b><p class=\"muted\">Google account for orders.</p></div>" +
-      "<div><b>Premium Quality</b><p class=\"muted\">Curated collection.</p></div>" +
+      '<div><b>Secure Login</b><p class="muted">Google account for orders.</p></div>' +
+      '<div><b>Premium Quality</b><p class="muted">Curated collection.</p></div>' +
       "</section></main>" + footer() + popupHtml + fabHtml;
   }
 
-  function repeat(s, n) {
-    var out = "";
-    for (var i = 0; i < n; i++) out += s;
-    return out;
+  function bindHome() {
+    var aromaBtns = document.querySelectorAll('[data-action="aroma"]');
+    for (var i = 0; i < aromaBtns.length; i++) {
+      aromaBtns[i].onclick = function (e) {
+        e.preventDefault();
+        openAroma();
+      };
+    }
+    var newsBtns = document.querySelectorAll('[data-action="newsletter"]');
+    for (var j = 0; j < newsBtns.length; j++) {
+      newsBtns[j].onclick = function (e) {
+        e.preventDefault();
+        subscribeNewsletter();
+      };
+    }
+    var popupClose = $("#aromaPopupClose");
+    if (popupClose) {
+      popupClose.onclick = function (e) {
+        e.preventDefault();
+        var p = $("#sitePopup");
+        if (p) p.remove();
+      };
+    }
+    bindAddButtons();
   }
 
   function shop() {
     var active = products.filter(function (p) { return p.is_active !== 0; });
     var catsHtml = categories.map(function (c) {
-      return '<button class="chip">' + esc(c.name) + "</button>";
+      return '<button type="button" class="chip">' + esc(c.name) + "</button>";
     }).join("");
 
     return header() +
       '<main class="section container">' +
       '<div class="section-head"><div><div class="kicker">AROMA LAB</div><h2>Shop Fragrances</h2></div></div>' +
-      '<div class="filters"><button class="chip active">All</button>' + catsHtml + "</div>" +
+      '<div class="filters"><button type="button" class="chip active">All</button>' + catsHtml + "</div>" +
       '<div class="grid shopgrid">' +
       (active.length ? active.map(productCard).join("") : '<div class="empty">No products yet.</div>') +
       "</div></main>" + footer();
@@ -420,12 +499,12 @@ alert("AROMA APP.JS LOADED");
       '<main class="section container"><div class="product-detail">' +
       imgHtml +
       "<div>" +
-      '<div class="kicker">' + esc(p.gender || "UNISEX") + (p.size ? " " + ICON_DOT + " " + esc(p.size) : "") + "</div>" +
+      '<div class="kicker">' + esc(p.gender || "UNISEX") + (p.size ? " | " + esc(p.size) : "") + "</div>" +
       "<h2>" + esc(p.name) + "</h2>" +
       '<div class="price large">' + money(p.price) + "</div>" +
       '<p class="muted bigline">' + esc(p.description || "") + "</p>" +
       notesHtml +
-      '<br><button class="goldbtn" onclick=\'window.aromaAdd(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>Add to Cart</button>' +
+      '<br><button type="button" class="goldbtn" data-add="' + p.id + '">Add to Cart</button>' +
       "</div></div></main>" + footer();
   }
 
@@ -442,7 +521,7 @@ alert("AROMA APP.JS LOADED");
     var p = S.popup || {};
     sessionStorage.setItem("popupShown", "1");
     return '<div class="popup" id="sitePopup"><div>' +
-      '<button class="close" onclick="document.getElementById(\'sitePopup\').remove()">' + ICON_CLOSE + '</button>' +
+      '<button type="button" class="close" id="aromaPopupClose">&times;</button>' +
       '<div class="kicker">AROMA LAB</div>' +
       "<h2>" + esc(p.title) + "</h2>" +
       "<p>" + esc(p.text) + "</p>" +
@@ -555,18 +634,18 @@ alert("AROMA APP.JS LOADED");
           "<div><b>" + esc(x.name) + "</b>" +
           '<div class="muted">Qty ' + x.qty + "</div>" +
           '<div class="price">' + money(x.price * x.qty) + "</div></div>" +
-          '<button class="ghostbtn" onclick="window.aromaRemove(' + x.id + ')">' + ICON_CLOSE + '</button>' +
+          '<button type="button" class="ghostbtn" data-remove="' + x.id + '">&times;</button>' +
           "</div>";
       }).join("")
       : '<div class="empty">Your cart is empty.</div>';
 
     var checkoutBtn = cart.length
-      ? '<button class="goldbtn full" onclick="window.aromaCheckout()">Checkout</button>'
+      ? '<button type="button" class="goldbtn full" data-action="checkout">Checkout</button>'
       : "";
 
     var html = '<div class="drawer" id="cartDrawer">' +
       '<div class="drawer-panel">' +
-      '<button class="ghostbtn" onclick="document.getElementById(\'cartDrawer\').remove()">Close</button>' +
+      '<button type="button" class="ghostbtn" data-action="close-cart">Close</button>' +
       "<h2>Shopping Cart</h2>" +
       itemsHtml +
       "<hr>" +
@@ -577,15 +656,41 @@ alert("AROMA APP.JS LOADED");
       "</div></div>";
 
     document.body.insertAdjacentHTML("beforeend", html);
+
+    var removeBtns = document.querySelectorAll("[data-remove]");
+    for (var k = 0; k < removeBtns.length; k++) {
+      removeBtns[k].onclick = function (e) {
+        e.preventDefault();
+        var id = this.getAttribute("data-remove");
+        var numId = isNaN(Number(id)) ? id : Number(id);
+        removeFromCart(numId);
+      };
+    }
+
+    var closeBtn = document.querySelector('[data-action="close-cart"]');
+    if (closeBtn) closeBtn.onclick = function (e) {
+      e.preventDefault();
+      var d = $("#cartDrawer");
+      if (d) d.remove();
+    };
+
+    var checkoutBtnEl = document.querySelector('[data-action="checkout"]');
+    if (checkoutBtnEl) checkoutBtnEl.onclick = function (e) {
+      e.preventDefault();
+      checkout();
+    };
   }
 
   function loginGoogle() {
     try {
       var clientId = "";
-      if (S && S.google_client_id) clientId = S.google_client_id;
-      if (!clientId && C && C.GOOGLE_CLIENT_ID) clientId = C.GOOGLE_CLIENT_ID;
-      if (!clientId) clientId = localStorage.getItem("aroma_google_client_id") || "";
-      clientId = String(clientId).trim();
+      if (S && S.google_client_id) clientId = String(S.google_client_id);
+      if (!clientId && C && C.GOOGLE_CLIENT_ID) clientId = String(C.GOOGLE_CLIENT_ID);
+      if (!clientId) {
+        var ls = localStorage.getItem("aroma_google_client_id");
+        if (ls) clientId = String(ls);
+      }
+      clientId = clientId.trim();
 
       if (!clientId) {
         alert("Google login not configured. Client ID missing.");
@@ -617,8 +722,8 @@ alert("AROMA APP.JS LOADED");
               toast("Login successful");
               render();
             })
-            .catch(function (e) {
-              alert("Login failed: " + e.message);
+            .catch(function (err) {
+              alert("Login failed: " + err.message);
             });
         }
       });
@@ -632,15 +737,23 @@ alert("AROMA APP.JS LOADED");
     if (!user) {
       return page("Account",
         '<p>Please sign in with Google to view your account.</p>' +
-        '<button class="goldbtn" onclick="window.aromaLogin()">Sign in with Google</button>');
+        '<button type="button" class="goldbtn" data-action="login">Sign in with Google</button>');
     }
     return header() +
       '<main class="section container"><div class="panel accountpanel">' +
       "<h2>My Account</h2>" +
-      "<p>" + esc(user.name) + " " + ICON_DOT + " " + esc(user.email) + "</p>" +
-      '<button class="ghostbtn" onclick="window.aromaLoadOrders()">Load My Orders</button>' +
+      "<p>" + esc(user.name) + " | " + esc(user.email) + "</p>" +
+      '<button type="button" class="ghostbtn" data-action="load-orders">Load My Orders</button>' +
       '<div id="ordersBox"></div>' +
       "</div></main>" + footer();
+  }
+
+  function bindAccount() {
+    var loadBtn = document.querySelector('[data-action="load-orders"]');
+    if (loadBtn) loadBtn.onclick = function (e) {
+      e.preventDefault();
+      loadOrders();
+    };
   }
 
   function loadOrders() {
@@ -648,8 +761,8 @@ alert("AROMA APP.JS LOADED");
       var items = d.items || [];
       var html = items.length
         ? items.map(function (o) {
-          return '<div class="order"><b>' + esc(o.order_number) + "</b> " + ICON_DOT + " " +
-            money(o.total) + " " + ICON_DOT + " " + esc(o.order_status) +
+          return '<div class="order"><b>' + esc(o.order_number) + "</b> | " +
+            money(o.total) + " | " + esc(o.order_status) +
             '<br><span class="muted">' + esc(o.created_at || "") + "</span></div>";
         }).join("")
         : '<p class="muted">No orders yet.</p>';
@@ -716,15 +829,28 @@ alert("AROMA APP.JS LOADED");
     var ask = S.ask_aroma || {};
     var html = '<div class="drawer" id="aromaDrawer">' +
       '<div class="drawer-panel">' +
-      '<button class="ghostbtn" onclick="document.getElementById(\'aromaDrawer\').remove()">Close</button>' +
+      '<button type="button" class="ghostbtn" data-action="close-aroma">Close</button>' +
       "<h2>" + esc(ask.title || "Ask Aroma") + "</h2>" +
       '<p class="muted">' + esc(ask.welcome || "") + "</p>" +
       '<div id="chat"></div>' +
       '<div class="chatrow">' +
       '<input id="aromaInput" placeholder="e.g. sweet floral for evening">' +
-      '<button class="goldbtn" onclick="window.aromaAsk()">Ask</button>' +
+      '<button type="button" class="goldbtn" data-action="ask-aroma">Ask</button>' +
       "</div></div></div>";
     document.body.insertAdjacentHTML("beforeend", html);
+
+    var closeBtn = document.querySelector('[data-action="close-aroma"]');
+    if (closeBtn) closeBtn.onclick = function (e) {
+      e.preventDefault();
+      var d = $("#aromaDrawer");
+      if (d) d.remove();
+    };
+
+    var askBtn = document.querySelector('[data-action="ask-aroma"]');
+    if (askBtn) askBtn.onclick = function (e) {
+      e.preventDefault();
+      askAroma();
+    };
   }
 
   function askAroma() {
@@ -769,46 +895,55 @@ alert("AROMA APP.JS LOADED");
     });
   }
 
-  function toggleMenu() {
-    var nav = document.querySelector("nav");
-    if (nav) nav.classList.toggle("open");
-  }
-
   function render() {
     var hash = location.hash.replace(/^#\/?/, "");
     var html;
 
-    if (!hash) html = home();
-    else if (hash === "shop") html = shop();
-    else if (hash.indexOf("product/") === 0) html = product(hash.split("/")[1]);
-    else if (hash === "about") html = page(
-      esc((S.content && S.content.about_title) || "About AROMA LAB"),
-      "<p>" + esc((S.content && S.content.about_body) || "") + "</p>"
-    );
-    else if (hash === "contact") html = page(
-      esc((S.content && S.content.contact_title) || "Contact AROMA LAB"),
-      "<p>" + esc((S.content && S.content.contact_body) || "").replace(/\n/g, "<br>") + "</p>" +
-      '<p><a href="https://wa.me/' + esc(S.site.whatsapp || "") + '" class="goldbtn">WhatsApp</a></p>'
-    );
-    else if (hash === "privacy") html = page(
-      esc((S.content && S.content.privacy_title) || "Privacy Policy"),
-      "<p>" + esc((S.content && S.content.privacy_body) || (S.legal && S.legal.privacy) || "") + "</p>"
-    );
-    else if (hash === "terms") html = page(
-      esc((S.content && S.content.terms_title) || "Terms & Conditions"),
-      "<p>" + esc((S.content && S.content.terms_body) || (S.legal && S.legal.terms) || "") + "</p>"
-    );
-    else if (hash === "returns") html = page(
-      esc((S.content && S.content.returns_title) || "Returns & Refunds"),
-      "<p>" + esc((S.content && S.content.returns_body) || (S.legal && S.legal.returns) || "") + "</p>"
-    );
-    else if (hash === "account") html = account();
-    else if (hash === "blog") html = blogPage();
-    else if (hash.indexOf("blog/") === 0) html = blogPost(hash.slice(5));
-    else if (hash === "faq") html = faqPage();
-    else if (hash === "team") html = teamPage();
-    else if (hash === "gallery") html = galleryPage();
-    else {
+    if (!hash) {
+      html = home();
+    } else if (hash === "shop") {
+      html = shop();
+    } else if (hash.indexOf("product/") === 0) {
+      html = product(hash.split("/")[1]);
+    } else if (hash === "about") {
+      html = page(
+        esc((S.content && S.content.about_title) || "About AROMA LAB"),
+        "<p>" + esc((S.content && S.content.about_body) || "") + "</p>"
+      );
+    } else if (hash === "contact") {
+      html = page(
+        esc((S.content && S.content.contact_title) || "Contact AROMA LAB"),
+        "<p>" + esc((S.content && S.content.contact_body) || "").replace(/\n/g, "<br>") + "</p>" +
+        '<p><a href="https://wa.me/' + esc(S.site.whatsapp || "") + '" class="goldbtn">WhatsApp</a></p>'
+      );
+    } else if (hash === "privacy") {
+      html = page(
+        esc((S.content && S.content.privacy_title) || "Privacy Policy"),
+        "<p>" + esc((S.content && S.content.privacy_body) || (S.legal && S.legal.privacy) || "") + "</p>"
+      );
+    } else if (hash === "terms") {
+      html = page(
+        esc((S.content && S.content.terms_title) || "Terms & Conditions"),
+        "<p>" + esc((S.content && S.content.terms_body) || (S.legal && S.legal.terms) || "") + "</p>"
+      );
+    } else if (hash === "returns") {
+      html = page(
+        esc((S.content && S.content.returns_title) || "Returns & Refunds"),
+        "<p>" + esc((S.content && S.content.returns_body) || (S.legal && S.legal.returns) || "") + "</p>"
+      );
+    } else if (hash === "account") {
+      html = account();
+    } else if (hash === "blog") {
+      html = blogPage();
+    } else if (hash.indexOf("blog/") === 0) {
+      html = blogPost(hash.slice(5));
+    } else if (hash === "faq") {
+      html = faqPage();
+    } else if (hash === "team") {
+      html = teamPage();
+    } else if (hash === "gallery") {
+      html = galleryPage();
+    } else {
       var customPage = null;
       for (var i = 0; i < pages.length; i++) {
         if (String(pages[i].slug).replace(/^\//, "") === hash) {
@@ -827,6 +962,9 @@ alert("AROMA APP.JS LOADED");
     if (app) app.innerHTML = html;
     applyTheme();
     renderCartCount();
+    bindHeader();
+    bindHome();
+    bindAccount();
   }
 
   window.aromaAdd = addToCart;
@@ -837,7 +975,6 @@ alert("AROMA APP.JS LOADED");
   window.aromaOpenAroma = openAroma;
   window.aromaAsk = askAroma;
   window.aromaSubscribe = subscribeNewsletter;
-  window.aromaToggleMenu = toggleMenu;
   window.aromaLoadOrders = loadOrders;
 
   function boot() {
@@ -882,13 +1019,12 @@ alert("AROMA APP.JS LOADED");
       applyTheme();
       render();
     }).catch(function (e) {
-      console.error("Boot error:", e);
       var app = $("#app");
       if (app) {
         app.innerHTML = '<div style="display:grid;place-items:center;min-height:100vh;text-align:center;padding:20px">' +
           '<div><h2 style="font-family:Georgia,serif;color:#d4af37;margin-bottom:16px">AROMA LAB</h2>' +
           '<p style="color:#b9ad9e">Could not load site. Please refresh.</p>' +
-          '<button onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#d4af37;color:#17120b;border:0;border-radius:99px;font-weight:800;cursor:pointer">Retry</button></div></div>';
+          '<button type="button" onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#d4af37;color:#17120b;border:0;border-radius:99px;font-weight:800;cursor:pointer">Retry</button></div></div>';
       }
     });
   }
