@@ -227,7 +227,7 @@
       '<p class="muted desc">' + esc(p.description || "") + "</p>" +
       '<div class="price">' + money(p.price) + "</div>" +
       '<div class="card-actions">' +
-      '<button class="ghostbtn" onclick="window.aromaAdd(' + JSON.stringify(p).replace(/"/g, "&quot;") + ')">Add</button>' +
+      '<button class="ghostbtn" onclick=\'window.aromaAdd(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>Add</button>' +
       '<a class="goldbtn" href="#/product/' + p.id + '">View</a>' +
       "</div></div></article>";
   }
@@ -409,7 +409,7 @@
       '<div class="price large">' + money(p.price) + "</div>" +
       '<p class="muted bigline">' + esc(p.description || "") + "</p>" +
       notesHtml +
-      '<br><button class="goldbtn" onclick="window.aromaAdd(' + JSON.stringify(p).replace(/"/g, "&quot;") + ')">Add to Cart</button>' +
+      '<br><button class="goldbtn" onclick=\'window.aromaAdd(' + JSON.stringify(p).replace(/'/g, "&#39;") + ')\'>Add to Cart</button>' +
       "</div></div></main>" + footer();
   }
 
@@ -564,43 +564,51 @@
   }
 
   function loginGoogle() {
-    var clientId = (
-      S.google_client_id ||
-      C.GOOGLE_CLIENT_ID ||
-      localStorage.getItem("aroma_google_client_id") ||
-      ""
-    ).trim();
-
-    if (!clientId) {
-      alert("Google login not configured. Please set Client ID from admin panel.");
-      return;
-    }
-
-    if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-      alert("Google Sign-In is loading. Please try again in a moment.");
-      return;
-    }
-
     try {
+      var clientId = "";
+      if (S && S.google_client_id) clientId = S.google_client_id;
+      if (!clientId && C && C.GOOGLE_CLIENT_ID) clientId = C.GOOGLE_CLIENT_ID;
+      if (!clientId) clientId = localStorage.getItem("aroma_google_client_id") || "";
+      clientId = String(clientId).trim();
+
+      if (!clientId) {
+        alert("Google login not configured. Client ID missing.");
+        return;
+      }
+
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        alert("Google Sign-In library not loaded. Please refresh the page and try again.");
+        return;
+      }
+
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: function (response) {
-          api("/api/auth/google", {
+          fetch(API + "/api/auth/google", {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({ credential: response.credential })
-          }).then(function (data) {
-            user = data;
-            localStorage.setItem("aroma_google_client_id", clientId);
-            toast("Login successful");
-            render();
-          }).catch(function (e) {
-            alert("Login error: " + e.message);
-          });
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.error) {
+                alert("Login error: " + data.error);
+                return;
+              }
+              user = data;
+              localStorage.setItem("aroma_google_client_id", clientId);
+              toast("Login successful");
+              render();
+            })
+            .catch(function (e) {
+              alert("Login failed: " + e.message);
+            });
         }
       });
       window.google.accounts.id.prompt();
-    } catch (e) {
-      alert("Google login init error: " + e.message);
+    } catch (err) {
+      alert("Login error: " + err.message);
     }
   }
 
@@ -805,6 +813,7 @@
     renderCartCount();
   }
 
+  // Expose functions
   window.aromaAdd = addToCart;
   window.aromaRemove = removeFromCart;
   window.aromaOpenCart = openCart;
@@ -836,7 +845,6 @@
       menus = d.menus || [];
       currencies = d.currencies || [];
 
-      // Cache Client ID from public config
       if (S.google_client_id && !localStorage.getItem("aroma_google_client_id")) {
         localStorage.setItem("aroma_google_client_id", S.google_client_id);
       }
