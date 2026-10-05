@@ -26,6 +26,14 @@
   var user = null;
   var cart = JSON.parse(localStorage.getItem("aroma_cart") || "[]");
 
+  var ICON_CART = "&#128722;";
+  var ICON_ADMIN = "&#9881;";
+  var ICON_MENU = "&#9776;";
+  var ICON_STAR = "&#9733;";
+  var ICON_CLOSE = "&times;";
+  var ICON_DOT = "&middot;";
+  var ICON_DASH = "&mdash;";
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -154,12 +162,12 @@
 
     var cartHtml = "";
     if (h.show_cart !== false) {
-      cartHtml = '<button class="iconbtn" onclick="window.aromaOpenCart()">🛒 <span data-cart-count>0</span></button>';
+      cartHtml = '<button class="iconbtn" onclick="window.aromaOpenCart()">' + ICON_CART + ' <span data-cart-count>0</span></button>';
     }
 
     var adminHtml = "";
     if (isAdmin()) {
-      adminHtml = '<a class="admin-btn" href="/admin/">⚙ Admin</a>';
+      adminHtml = '<a class="admin-btn" href="/admin/">' + ICON_ADMIN + ' Admin</a>';
     }
 
     var loginHtml = "";
@@ -173,7 +181,7 @@
       "<small>" + esc(S.site.descriptor || "FINE FRAGRANCES") + "</small></span></a>" +
       "<nav>" + menuHtml + "</nav>" +
       '<div class="nav-actions">' + cartHtml + adminHtml + loginHtml +
-      '<button class="menuBtn" onclick="window.aromaToggleMenu()">☰</button>' +
+      '<button class="menuBtn" onclick="window.aromaToggleMenu()">' + ICON_MENU + '</button>' +
       "</div></div></header>";
   }
 
@@ -217,7 +225,7 @@
       : '<div style="display:grid;place-items:center;height:100%;color:#555;font-size:12px">No Image</div>';
 
     var gender = p.gender || "UNISEX";
-    var size = p.size ? " · " + esc(p.size) : "";
+    var size = p.size ? " " + ICON_DOT + " " + esc(p.size) : "";
 
     return '<article class="card">' +
       '<a href="#/product/' + p.id + '" class="product-img">' + imgHtml + "</a>" +
@@ -292,7 +300,7 @@
         '<div class="section-head"><div><div class="kicker">LOVE</div><h2>Testimonials</h2></div></div>' +
         '<div class="reviews">' +
         testimonials.slice(0, 6).map(function (t) {
-          var stars = "★".repeat(Math.max(0, Math.min(5, Number(t.rating || 5))));
+          var stars = repeat(ICON_STAR, Math.max(0, Math.min(5, Number(t.rating || 5))));
           return '<div class="review"><div class="stars">' + stars + "</div>" +
             "<b>" + esc(t.name) + "</b>" +
             '<p class="muted">' + esc(t.content || "") + "</p></div>";
@@ -306,7 +314,7 @@
         '<div class="section-head"><div><div class="kicker">REVIEWS</div><h2>Customer Reviews</h2></div></div>' +
         '<div class="reviews">' +
         reviews.slice(0, 6).map(function (r) {
-          var stars = "★".repeat(Math.max(0, Math.min(5, Number(r.rating || 0))));
+          var stars = repeat(ICON_STAR, Math.max(0, Math.min(5, Number(r.rating || 0))));
           return '<div class="review"><div class="stars">' + stars + "</div>" +
             "<b>" + esc(r.customer_name || "Customer") + "</b>" +
             '<p class="muted">' + esc(r.review || "") + "</p></div>";
@@ -367,6 +375,12 @@
       "</section></main>" + footer() + popupHtml + fabHtml;
   }
 
+  function repeat(s, n) {
+    var out = "";
+    for (var i = 0; i < n; i++) out += s;
+    return out;
+  }
+
   function shop() {
     var active = products.filter(function (p) { return p.is_active !== 0; });
     var catsHtml = categories.map(function (c) {
@@ -404,7 +418,7 @@
       '<main class="section container"><div class="product-detail">' +
       imgHtml +
       "<div>" +
-      '<div class="kicker">' + esc(p.gender || "UNISEX") + (p.size ? " · " + esc(p.size) : "") + "</div>" +
+      '<div class="kicker">' + esc(p.gender || "UNISEX") + (p.size ? " " + ICON_DOT + " " + esc(p.size) : "") + "</div>" +
       "<h2>" + esc(p.name) + "</h2>" +
       '<div class="price large">' + money(p.price) + "</div>" +
       '<p class="muted bigline">' + esc(p.description || "") + "</p>" +
@@ -426,7 +440,7 @@
     var p = S.popup || {};
     sessionStorage.setItem("popupShown", "1");
     return '<div class="popup" id="sitePopup"><div>' +
-      '<button class="close" onclick="document.getElementById(\'sitePopup\').remove()">×</button>' +
+      '<button class="close" onclick="document.getElementById(\'sitePopup\').remove()">' + ICON_CLOSE + '</button>' +
       '<div class="kicker">AROMA LAB</div>' +
       "<h2>" + esc(p.title) + "</h2>" +
       "<p>" + esc(p.text) + "</p>" +
@@ -539,7 +553,7 @@
           "<div><b>" + esc(x.name) + "</b>" +
           '<div class="muted">Qty ' + x.qty + "</div>" +
           '<div class="price">' + money(x.price * x.qty) + "</div></div>" +
-          '<button class="ghostbtn" onclick="window.aromaRemove(' + x.id + ')">×</button>' +
+          '<button class="ghostbtn" onclick="window.aromaRemove(' + x.id + ')">' + ICON_CLOSE + '</button>' +
           "</div>";
       }).join("")
       : '<div class="empty">Your cart is empty.</div>';
@@ -621,7 +635,7 @@
     return header() +
       '<main class="section container"><div class="panel accountpanel">' +
       "<h2>My Account</h2>" +
-      "<p>" + esc(user.name) + " · " + esc(user.email) + "</p>" +
+      "<p>" + esc(user.name) + " " + ICON_DOT + " " + esc(user.email) + "</p>" +
       '<button class="ghostbtn" onclick="window.aromaLoadOrders()">Load My Orders</button>' +
       '<div id="ordersBox"></div>' +
       "</div></main>" + footer();
@@ -632,8 +646,8 @@
       var items = d.items || [];
       var html = items.length
         ? items.map(function (o) {
-          return '<div class="order"><b>' + esc(o.order_number) + "</b> · " +
-            money(o.total) + " · " + esc(o.order_status) +
+          return '<div class="order"><b>' + esc(o.order_number) + "</b> " + ICON_DOT + " " +
+            money(o.total) + " " + ICON_DOT + " " + esc(o.order_status) +
             '<br><span class="muted">' + esc(o.created_at || "") + "</span></div>";
         }).join("")
         : '<p class="muted">No orders yet.</p>';
@@ -813,7 +827,6 @@
     renderCartCount();
   }
 
-  // Expose functions
   window.aromaAdd = addToCart;
   window.aromaRemove = removeFromCart;
   window.aromaOpenCart = openCart;
@@ -855,7 +868,7 @@
       return api("/api/customer/me").catch(function () { return null; });
     }).then(function (u) {
       user = u;
-      document.title = (S.seo && S.seo.site_title) || "AROMA LAB — Fine Fragrances";
+      document.title = (S.seo && S.seo.site_title) || "AROMA LAB - Fine Fragrances";
       var metaDesc = document.querySelector('meta[name="description"]');
       if (metaDesc && S.seo && S.seo.meta_description) {
         metaDesc.setAttribute("content", S.seo.meta_description);
