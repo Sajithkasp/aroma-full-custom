@@ -1,3 +1,4 @@
+alert("AROMA APP.JS LOADED");
 (function () {
   "use strict";
 
