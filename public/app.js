@@ -563,32 +563,45 @@
     document.body.insertAdjacentHTML("beforeend", html);
   }
 
-  function login() {
-    var clientId = (S.google_client_id || C.GOOGLE_CLIENT_ID || "").trim();
+  function loginGoogle() {
+    var clientId = (
+      S.google_client_id ||
+      C.GOOGLE_CLIENT_ID ||
+      localStorage.getItem("aroma_google_client_id") ||
+      ""
+    ).trim();
+
     if (!clientId) {
-      alert("Google login not configured. Set Client ID from admin panel.");
+      alert("Google login not configured. Please set Client ID from admin panel.");
       return;
     }
+
     if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-      alert("Google Sign-In is loading. Please try again.");
+      alert("Google Sign-In is loading. Please try again in a moment.");
       return;
     }
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: function (response) {
-        api("/api/auth/google", {
-          method: "POST",
-          body: JSON.stringify({ credential: response.credential })
-        }).then(function (data) {
-          user = data;
-          toast("Login successful");
-          render();
-        }).catch(function (e) {
-          alert("Login error: " + e.message);
-        });
-      }
-    });
-    window.google.accounts.id.prompt();
+
+    try {
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: function (response) {
+          api("/api/auth/google", {
+            method: "POST",
+            body: JSON.stringify({ credential: response.credential })
+          }).then(function (data) {
+            user = data;
+            localStorage.setItem("aroma_google_client_id", clientId);
+            toast("Login successful");
+            render();
+          }).catch(function (e) {
+            alert("Login error: " + e.message);
+          });
+        }
+      });
+      window.google.accounts.id.prompt();
+    } catch (e) {
+      alert("Google login init error: " + e.message);
+    }
   }
 
   function account() {
@@ -625,7 +638,7 @@
 
   function checkout() {
     if (!user) {
-      login();
+      loginGoogle();
       return;
     }
     var address = prompt("Shipping address:");
@@ -796,7 +809,7 @@
   window.aromaRemove = removeFromCart;
   window.aromaOpenCart = openCart;
   window.aromaCheckout = checkout;
-  window.aromaLogin = login;
+  window.aromaLogin = loginGoogle;
   window.aromaOpenAroma = openAroma;
   window.aromaAsk = askAroma;
   window.aromaSubscribe = subscribeNewsletter;
@@ -807,8 +820,7 @@
     api("/api/public/bootstrap").then(function (d) {
       var settings = d.settings || {};
       for (var k in settings) {
-        if (S.hasOwnProperty(k)) S[k] = settings[k];
-        else S[k] = settings[k];
+        S[k] = settings[k];
       }
       products = d.products || [];
       categories = d.categories || [];
@@ -823,6 +835,14 @@
       sliders = d.sliders || [];
       menus = d.menus || [];
       currencies = d.currencies || [];
+
+      // Cache Client ID from public config
+      if (S.google_client_id && !localStorage.getItem("aroma_google_client_id")) {
+        localStorage.setItem("aroma_google_client_id", S.google_client_id);
+      }
+      if (!localStorage.getItem("aroma_google_client_id") && C.GOOGLE_CLIENT_ID) {
+        localStorage.setItem("aroma_google_client_id", C.GOOGLE_CLIENT_ID);
+      }
 
       return api("/api/customer/me").catch(function () { return null; });
     }).then(function (u) {
