@@ -1,3 +1,4 @@
+alert("aromaLogin type: " + typeof window.aromaLogin);
 alert("AROMA APP.JS LOADED");
 (function () {
   "use strict";
