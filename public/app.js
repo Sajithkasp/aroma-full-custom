@@ -1,3 +1,6 @@
+window.addEventListener("error", function(e) {
+  alert("JS ERROR: " + e.message + " at line " + e.lineno);
+});
 (function () {
   "use strict";
 
